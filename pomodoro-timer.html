@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dual-Mode Timer</title>
+    <style>
+        :root {
+            --bg-color: #333;
+            --text-color: #f0f0f0;
+            --container-bg: #555;
+            --cup-color: #a0816c;
+            --coffee-color: #4a3424;
+            --button-bg: #45a049;
+            --button-text: #f0f0f0;
+            --toggle-bg: #666;
+            --toggle-active: #45a049;
+        }
+
+        .light-theme {
+            --bg-color: #f0f0f0;
+            --text-color: #333;
+            --container-bg: white;
+            --cup-color: #d4a88c;
+            --coffee-color: #6f4e37;
+            --button-bg: #4CAF50;
+            --button-text: white;
+            --toggle-bg: #ddd;
+            --toggle-active: #4CAF50;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            text-align: center;
+            background-color: var(--container-bg);
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        #timer {
+            font-size: 3rem;
+            margin: 1rem 0;
+        }
+
+        button {
+            margin: 1rem;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            cursor: pointer;
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #coffee-cup {
+            width: 120px;
+            height: 90px;
+            margin: 1rem auto;
+            background: var(--cup-color);
+            border-radius: 0 0 70px 70px / 0 0 110px 110px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #coffee {
+            width: 100%;
+            height: 85%;
+            background: var(--coffee-color);
+            position: absolute;
+            bottom: 0;
+            transition: height 1s linear;
+            /* animation: wave 2s infinite alternate;    Removed according to Claude*/
+        }
+
+        #coffee::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 10px;
+            background: var(--coffee-color);
+            animation: wave 2s infinite alternate;
+        }
+
+        @keyframes wave {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-5px); }
+        }
+
+        #cup-handle {
+            width: 20px;
+            height: 30px;
+            border: 10px solid var(--cup-color);
+            border-left: 0;
+            border-radius: 0 25px 25px 0;
+            position: absolute;
+            right: -30px;
+            top: 15px;
+        }
+
+        #theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-color);
+        }
+
+        #mode-toggle {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            background-color: var(--toggle-bg);
+            border-radius: 20px;
+            padding: 5px;
+            cursor: pointer;
+        }
+
+        #mode-toggle span {
+            padding: 5px 10px;
+            border-radius: 15px;
+            transition: background-color 0.3s ease;
+        }
+
+        #mode-toggle .active {
+            background-color: var(--toggle-active);
+            color: var(--button-text);
+        }
+
+        #manual-inputs {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        #manual-inputs input {
+            width: 50px;
+            margin: 0 5px;
+        }
+    </style>
+</head>
+<body>
+    <button id="theme-toggle">🌓</button>
+    <div id="mode-toggle">
+        <span class="active" id="third-time">Third Time</span>
+        <span id="manual">Manual</span>
+    </div>
+    <div class="container">
+        <h1>Dual-Mode Timer</h1>
+        <div id="timer">00:00</div>
+        <div id="coffee-cup">
+            <div id="coffee"></div>
+            <div id="cup-handle"></div>
+        </div>
+        <button id="startStop">Start Work</button>
+        <p id="status">Ready to start working</p>
+        <div id="manual-inputs">
+            <label for="workTime">Work Time (min):</label>
+            <input type="number" id="workTime" value="25" min="1" max="60">
+        </div>
+    </div>
+
+    <script>
+        const timer = document.getElementById('timer');
+        const coffee = document.getElementById('coffee');
+        const startStopBtn = document.getElementById('startStop');
+        const statusText = document.getElementById('status');
+        const themeToggle = document.getElementById('theme-toggle');
+        const modeToggle = document.getElementById('mode-toggle');
+        const thirdTimeMode = document.getElementById('third-time');
+        const manualMode = document.getElementById('manual');
+        const manualInputs = document.getElementById('manual-inputs');
+        const workTimeInput = document.getElementById('workTime');
+
+        let countdown;
+        let isWorking = true;
+        let startTime;
+        let elapsedTime = 0;
+        let breakTime = 0;
+        let isThirdTimeMode = true;
+        let totalTime = 0;
+
+        function updateDisplay(time) {
+            const minutes = Math.floor(time / 60);
+            const seconds = time % 60;
+            timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            if (isWorking) {
+                const percentage = isThirdTimeMode ? 85 : 85 - (time / totalTime * 85);
+                coffee.style.height = `${percentage}%`;
+            } else {
+                const percentage = (breakTime - time) / breakTime * 85;
+                coffee.style.height = `${percentage}%`;
+            }
+        }
+
+        function startWork() {
+            clearInterval(countdown);
+            isWorking = true;
+            if (isThirdTimeMode) {
+                startTime = Date.now() - elapsedTime;
+                statusText.textContent = 'Working...';
+            } else {
+                totalTime = workTimeInput.value * 60;
+                startTime = Date.now();
+                statusText.textContent = `Working for ${workTimeInput.value} minutes...`;
+            }
+            startStopBtn.textContent = 'Stop Work';
+
+            countdown = setInterval(() => {
+                elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                if (!isThirdTimeMode && elapsedTime >= totalTime) {
+                    stopWork();
+                } else {
+                    updateDisplay(elapsedTime);
+                }
+            }, 1000);
+        }
+
+        function stopWork() {
+            clearInterval(countdown);
+            isWorking = false;
+            if (isThirdTimeMode) {
+                breakTime = Math.floor(elapsedTime / 3);
+                statusText.textContent = `Break time: ${breakTime} seconds`;
+            } else {
+                breakTime = Math.floor(totalTime / 3);
+                statusText.textContent = `Break time: ${Math.floor(breakTime / 60)} minutes`;
+            }
+            startStopBtn.textContent = 'Start Break';
+            updateDisplay(breakTime);
+        }
+
+        function startBreak() {
+            clearInterval(countdown);
+            let remainingBreakTime = breakTime;
+            startStopBtn.textContent = 'Skip Break';
+            statusText.textContent = 'On break...';
+
+            countdown = setInterval(() => {
+                if (remainingBreakTime > 0) {
+                    remainingBreakTime--;
+                    updateDisplay(remainingBreakTime);
+                } else {
+                    clearInterval(countdown);
+                    resetTimer();
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(countdown);
+            elapsedTime = 0;
+            isWorking = true;
+            startStopBtn.textContent = 'Start Work';
+            statusText.textContent = 'Ready to start working';
+            updateDisplay(0);
+        }
+
+        startStopBtn.addEventListener('click', () => {
+            if (isWorking) {
+                if (startStopBtn.textContent === 'Start Work') {
+                    startWork();
+                } else {
+                    stopWork();
+                }
+            } else {
+                if (startStopBtn.textContent === 'Start Break') {
+                    startBreak();
+                } else {
+                    resetTimer();
+                }
+            }
+        });
+
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('light-theme');
+        });
+
+        modeToggle.addEventListener('click', (e) => {
+            if (e.target.id === 'third-time' || e.target.id === 'manual') {
+                thirdTimeMode.classList.toggle('active');
+                manualMode.classList.toggle('active');
+                isThirdTimeMode = thirdTimeMode.classList.contains('active');
+                manualInputs.style.display = isThirdTimeMode ? 'none' : 'block';
+                resetTimer();
+            }
+        });
+
+        // Initialize the display
+        updateDisplay(0);
+    </script>
+</body>
+</html>
