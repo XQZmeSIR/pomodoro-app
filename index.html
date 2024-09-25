@@ -160,6 +160,30 @@
             width: 50px;
             margin: 0 5px;
         }
+
+        #session-record {
+            font-family: Rubik, sans-serif;
+            margin-top: 1rem;
+            text-align: center;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--text-color);
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #session-record h3 {
+            margin-top: 0;
+        }
+
+        #session-record ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #session-record li {
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -181,6 +205,10 @@
             <label for="workTime">Work Time (min):</label>
             <input type="number" id="workTime" value="25" min="1" max="60">
         </div>
+        <div id="session-record">
+            <h3>Session Record</h3>
+            <ul id="session-list"></ul>
+        </div>
     </div>
 
     <script>
@@ -194,7 +222,12 @@
         const manualMode = document.getElementById('manual');
         const manualInputs = document.getElementById('manual-inputs');
         const workTimeInput = document.getElementById('workTime');
-
+        
+        const sessionList = document.getElementById('session-list');
+        
+        let sessionRecords = [];
+        let sessionStartTime;
+        
         let countdown;
         let isWorking = true;
         let startTime;
@@ -220,6 +253,7 @@
         function startWork() {
             clearInterval(countdown);
             isWorking = true;
+            sessionStartTime = new Date();
             if (isThirdTimeMode) {
                 startTime = Date.now() - elapsedTime;
                 statusText.textContent = 'Working...';
@@ -240,18 +274,45 @@
             }, 1000);
         }
 
+
         function stopWork() {
             clearInterval(countdown);
             isWorking = false;
+            const sessionEndTime = new Date();
             if (isThirdTimeMode) {
                 breakTime = Math.floor(elapsedTime / 3);
                 statusText.textContent = `Break time: ${breakTime} seconds`;
+                recordSession(sessionStartTime, sessionEndTime, elapsedTime);
             } else {
                 breakTime = Math.floor(totalTime / 3);
                 statusText.textContent = `Break time: ${Math.floor(breakTime / 60)} minutes`;
+                recordSession(sessionStartTime, sessionEndTime, totalTime);
             }
             startStopBtn.textContent = 'Start Break';
             updateDisplay(breakTime);
+        }
+
+
+        function recordSession(startTime, endTime, duration) {
+            const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            const startTimeStr = formatTime(startTime);
+            const endTimeStr = formatTime(endTime);
+            const hours = Math.floor(duration / 3600);
+            const minutes = Math.floor((duration % 3600) / 60);
+            const durationStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            
+            sessionRecords.unshift(`${startTimeStr} - ${endTimeStr} Worked for ${durationStr}`);
+            updateSessionRecord();
+        }
+
+
+        function updateSessionRecord() {
+            sessionList.innerHTML = '';
+            sessionRecords.forEach(record => {
+                const li = document.createElement('li');
+                li.textContent = record;
+                sessionList.appendChild(li);
+            });
         }
 
         function startBreak() {
